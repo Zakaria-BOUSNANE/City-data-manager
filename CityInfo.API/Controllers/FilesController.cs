@@ -22,7 +22,6 @@ namespace CityInfo.API.Controllers
         public ActionResult GetFile(string fileId)
         {
             // look up the actual file, depending on the fileId...
-            // demo code
             var pathToFile = "getting-started-with-rest-slides.pdf";
 
             // check whether the file exists

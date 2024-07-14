@@ -5,8 +5,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
-
-
+using Microsoft.OpenApi.Models;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
@@ -19,38 +18,51 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
 
 // Add services to the container.
-
 builder.Services.AddControllers(options =>
 {
     options.ReturnHttpNotAcceptable = true;
 }).AddNewtonsoftJson()
-.AddXmlDataContractSerializerFormatters();
-
-builder.Services.AddProblemDetails();
-//builder.Services.AddProblemDetails(options =>
-//{
-//    options.CustomizeProblemDetails = ctx =>
-//    {
-//        ctx.ProblemDetails.Extensions.Add("additionalInfo",
-//            "Additional info example");
-//        ctx.ProblemDetails.Extensions.Add("server", 
-//            Environment.MachineName);
-//    };
-//});
+  .AddXmlDataContractSerializerFormatters();
 
 // Learn more about configuring Swagger/OpenAPI at
 // https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        In = ParameterLocation.Header,
+        Description = "Please enter a valid token",
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        BearerFormat = "JWT",
+        Scheme = "Bearer"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+});
+
 builder.Services.AddSingleton<FileExtensionContentTypeProvider>();
 
 #if DEBUG
 builder.Services.AddTransient<IMailService, LocalMailService>();
-#else 
+#else
 builder.Services.AddTransient<IMailService, CloudMailService>();
 #endif
 
-builder.Services.AddSingleton<CitiesDataStore>();
 
 builder.Services.AddDbContext<CityInfoContext>(
     dbContextOptions => dbContextOptions.UseNpgsql(
@@ -71,17 +83,17 @@ builder.Services.AddAuthentication("Bearer")
             ValidIssuer = builder.Configuration["Authentication:Issuer"],
             ValidAudience = builder.Configuration["Authentication:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
-               Convert.FromBase64String(builder.Configuration["Authentication:SecretForKey"]))
+                Convert.FromBase64String(builder.Configuration["Authentication:SecretForKey"]!))
         };
-    }
-    );
+    });
 
+// Add authorization policy for Antwerp city claim requirement
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("MustBeFromAntwerp", policy =>
+    options.AddPolicy("MustBeFromGrenoble", policy =>
     {
         policy.RequireAuthenticatedUser();
-        policy.RequireClaim("city", "Antwerp");
+        policy.RequireClaim("city", "Grenoble");
     });
 });
 
@@ -90,7 +102,7 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler();
+    app.UseExceptionHandler("/error");
 }
 
 if (app.Environment.IsDevelopment())
@@ -107,9 +119,6 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 
-app.UseEndpoints(endpoints =>
-{
-    endpoints.MapControllers();
-});
+app.MapControllers();
 
 app.Run();
