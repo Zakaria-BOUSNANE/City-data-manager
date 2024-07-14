@@ -5,7 +5,8 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
-using System.Text;
+
+
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
@@ -14,8 +15,7 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
-//builder.Logging.ClearProviders();
-//builder.Logging.AddConsole();
+
 builder.Host.UseSerilog();
 
 // Add services to the container.
@@ -49,10 +49,11 @@ builder.Services.AddTransient<IMailService, LocalMailService>();
 #else 
 builder.Services.AddTransient<IMailService, CloudMailService>();
 #endif
+
 builder.Services.AddSingleton<CitiesDataStore>();
 
 builder.Services.AddDbContext<CityInfoContext>(
-    dbContextOptions => dbContextOptions.UseSqlite(
+    dbContextOptions => dbContextOptions.UseNpgsql(
         builder.Configuration["ConnectionStrings:CityInfoDBConnectionString"]));
 
 builder.Services.AddScoped<ICityInfoRepository, CityInfoRepository>();
